@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Complex To-Do — PWA</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f1724">
+  <style>
+    body { font-family: sans-serif; background: #f4f4f4; margin: 0; }
+    .app { padding: 20px; }
+    .btn { padding: 8px 12px; background: #0f1724; color: white; border: none; cursor: pointer; border-radius: 4px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; }
+    .card { background: white; padding: 20px; border-radius: 8px; }
+    .subtasks { margin-top: 8px; }
+    .subtasks li { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .subtasks input[type="text"] { flex: 1; }
+  </style>
+</head>
+<body>
+<div id="app" class="app">
+  <h1>Complex To-Do</h1>
+  <button class="btn" onclick="openTaskEditor()">+ New Task</button>
+  <div id="taskList"></div>
+</div>
+
+<div id="modalBackdrop" class="modal-backdrop">
+  <div class="modal card">
+    <h2 id="modalTitle">New Task</h2>
+    <label>Title</label>
+    <input id="taskTitle">
+    <label>Description</label>
+    <textarea id="taskDesc"></textarea>
+    <label>Subtasks</label>
+    <ul id="subtaskList" class="subtasks"></ul>
+    <button class="btn" id="addSubtaskBtn">+ Add Subtask</button>
+    <br><br>
+    <button class="btn" id="saveTaskBtn">Save</button>
+    <button class="btn" id="cancelTaskBtn">Cancel</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'complex_todo_v2';
+  let state = { tasks: [] };
+
+  const qs = s => document.querySelector(s);
+
+  function load() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  }
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    render();
+  }
+
+  function render() {
+    const list = qs('#taskList');
+    list.innerHTML = '';
+    state.tasks.forEach((t, idx) => {
+      const div = document.createElement('div');
+      div.innerHTML = '<strong>' + t.title + '</strong><br>' + t.desc +
+        '<ul>' + (t.subtasks||[]).map(st => '<li>'+(st.done?'✅ ':'⬜ ')+st.text+'</li>').join('') + '</ul>';
+      list.appendChild(div);
+    });
+  }
+
+  function openTaskEditor(id) {
+    const t = state.tasks[id] || { subtasks: [] };
+    qs('#taskTitle').value = t.title || '';
+    qs('#taskDesc').value = t.desc || '';
+    const list = qs('#subtaskList');
+    list.innerHTML = '';
+    (t.subtasks || []).forEach((st) => {
+      const li = document.createElement('li');
+      li.innerHTML = '<input type="checkbox" '+(st.done?'checked':'')+'> <input type="text" value="'+st.text+'">';
+      list.appendChild(li);
+    });
+    qs('#addSubtaskBtn').onclick = () => {
+      t.subtasks.push({ text: '', done: false });
+      openTaskEditor(id);
+    };
+    qs('#saveTaskBtn').onclick = () => {
+      t.title = qs('#taskTitle').value;
+      t.desc = qs('#taskDesc').value;
+      t.subtasks = Array.from(qs('#subtaskList').children).map(li => ({
+        done: li.querySelector('input[type="checkbox"]').checked,
+        text: li.querySelector('input[type="text"]').value
+      }));
+      if (id != null && state.tasks[id]) state.tasks[id] = t; else state.tasks.push(t);
+      save();
+      closeModal();
+    };
+    document.getElementById('modalBackdrop').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('modalBackdrop').style.display = 'none';
+  }
+
+  qs('#cancelTaskBtn').onclick = closeModal;
+
+  load();
+  render();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+  window.openTaskEditor = openTaskEditor;
+})();
+</script>
+</body>
+</html>
